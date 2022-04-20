@@ -1,6 +1,6 @@
 # hca-httpie-auth
 
-As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorzaion: Bearer ${token}` header to the executed request.  
+As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorization: Bearer ${token}` header to the executed request.  
 
 ## Token request patterns
 
