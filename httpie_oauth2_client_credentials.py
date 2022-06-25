@@ -45,7 +45,7 @@ class OAuth2ClientCredentials:
         if self.token_request_type == 'basic':
             credentials = u'%s:%s' % (self.client_id, self.client_secret)
             token = b64encode(credentials.encode('utf8')).strip().decode('latin1')
-            req_headers['Authorzaion'] = 'Basic %s' % token
+            req_headers['Authorization'] = 'Basic %s' % token
             post_data = urlencode(post_params).encode()
 
         else:
