@@ -5,7 +5,7 @@ setup(
     description="httpie auth plugin for OAuth2.0 client credentials flow.",
     long_description=open('README.md').read(),
     long_description_content_type="text/markdown",
-    version="0.1.1",
+    version="0.1.2",
     author='satdoc',
     author_email='satodoc-develop-public@outlook.com',
     license='MIT',
