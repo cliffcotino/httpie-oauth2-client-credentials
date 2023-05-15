@@ -81,6 +81,7 @@ class OAuth2ClientCredentialsPlugin(AuthPlugin):
 
     name = 'OAuth2.0 client credentilas flow.'
     auth_type = 'oauth2-client-credentials'
+    netrc_parse = True
     description = 'Set the Bearer token obtained in the OAuth2.0 client_credentials flow to the Authorization header.'
 
     params = httpie_args_parser.add_argument_group(title='OAuth2.0 client credentilas flow options')

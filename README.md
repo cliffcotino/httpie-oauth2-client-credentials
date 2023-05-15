@@ -103,6 +103,35 @@ Content-Type: application/json
 }
 ```
 
+## Supported .netrc
+
+Supported `.netrc`.  
+Please check the [httpie documentation](https://httpie.io/docs/cli/netrc) for usage instructions.
+
+### Important Notes before Use
+
+The value for "machine" in the ".netrc" file is the TARGET_ENDPOINT host, not the TOKEN_ENDPOINT host.
+It should be TOKEN_ENDPOINT, but the main body of httpie is designed to extract authentication information from the TARGET_ENDPOINT host.
+
+```bash
+# Create(or add) .netrc file.
+cat <<EOF>> ~/.netrc
+
+machine   {TARGET_ENDPOINT_HOST}
+login     {Your Client ID}
+password  {Your Client Secret}
+EOF
+
+# Change permission.
+chmod 600 ~/.netrc
+# Example request.
+http --auth-type=oauth2-client-credentials \
+     --token-endpoint="${TOKEN_ENDPOINT_URL}" \
+     --token-request-type="form" \
+     --scope="${SCOPE}" \
+     ${TARGET_ENDPOINT_URL}
+```
+
 ## Options
 
 - `--print-token-response`  
