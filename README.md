@@ -2,14 +2,15 @@
 
 As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorization: Bearer ${token}` header to the executed request.  
 
-## Token request patterns
-
-Token request patterns are supported for the following:
-
 ## Installation
 
 ```bash
 pip install httpie-oauth2-client-credentials
+```
+
+Another option is to install from local source:
+```bash
+httpie cli plugins install .
 ```
 
 ## Usage
@@ -17,7 +18,7 @@ pip install httpie-oauth2-client-credentials
 Since the format of the request to get the token depends on the support of the server, this module supports the following three patterns depending on the `--token-request-type` option.  
 The SCOPE parameter is optional in all patterns.
 
-### Basic authentication (default)
+### Basic authentication (application/x-www-form-urlencoded) - default
 
 Set CLIENT_ID and CLIENT_SECRET to Basic authentication to get the token.  
 Since this pattern is the default, you can omit the `--token-request-type` option.
@@ -101,6 +102,64 @@ Content-Type: application/json
     "grant_type": "client_credentials",
     "scope": "${SCOPE}"
 }
+```
+
+### Private Key JWT request (application/x-www-form-urlencoded)
+
+Sends a request with `client_assertion_type` set to `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` as defined by the [private_key_jwt](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication) client authentication method.
+The `${CLIENT_SECRET}` value must be a private key in PEM format (or a reference to a certificate in PEM format if the value starts with a `@`-character).
+
+Private key example:
+```text
+-----BEGIN PRIVATE KEY-----
+....
+-----END PRIVATE KEY-----
+```
+
+The private key is used to generate a signature for the JWT with the following header and payload:
+
+Header:
+```json
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+```
+
+Payload:
+```json
+{
+  "iss": "${CLIENT_ID}",
+  "sub": "${CLIENT_ID}",
+  "jti": "${random_uuid}",
+  "aud": "${TOKEN_ENDPOINT}",
+  "exp": 1708426923,
+  "iat": 1708426323
+}
+```
+
+Execute command:
+
+```bash
+http --auth-type=oauth2-client-credentials \
+     --auth="${CLIENT_ID}:${CLIENT_SECRET}" \
+     --token-endpoint="${TOKEN_ENDPOINT_URL}" \
+     --token-request-type="private-key-jwt" \
+     --scope="${SCOPE}" \
+     ${TARGET_ENDPOINT_URL}
+```
+
+Token request:
+
+```text
+POST ${TOKEN_ENDPOINT_URL} HTTP/1.1
+Host: ${TOKEN_ENDPOINT_HOST}
+Content-Type: application/x-www-form-urlencoded
+
+client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer
+&client_assertion=JWT signed using private key ${CLIENT_SECRET}
+&grant_type=client_credentials
+&scope=${SCOPE}
 ```
 
 ## Supported .netrc
