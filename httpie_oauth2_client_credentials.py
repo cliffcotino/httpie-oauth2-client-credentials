@@ -1,21 +1,22 @@
 '''
 OAuth2.0 client credentials flow plugin for HTTPie.
 '''
-import os.path
+import json
 import sys
 import uuid
 from base64 import b64encode, urlsafe_b64encode
 from datetime import datetime, timedelta
-from httpie.plugins import AuthPlugin
-from httpie.cli.definition import parser as httpie_args_parser
-from urllib.request import Request, urlopen
-from urllib.parse import urlencode
+from pathlib import Path
 from urllib.error import HTTPError
-from cryptography.hazmat.primitives import serialization
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
-import json
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from httpie.cli.definition import parser as httpie_args_parser
+from httpie.plugins import AuthPlugin
 
 
 class OAuth2ClientCredentials:
@@ -115,15 +116,14 @@ class OAuth2ClientCredentials:
 
         if self.token_request_type == 'private-key-jwt':
             if self.client_secret.startswith('@'):
-                filename = self.client_secret[1:]
-                if not os.path.isfile(filename):
-                    raise ValueError('file "' + filename + '" is not a file')
-                with open(filename, 'rb') as key_file:
-                    certificate = key_file.read()
+                certificate_path = Path(self.client_secret[1:])
+                if not certificate_path.is_file():
+                    raise ValueError(f'file "{certificate_path}" is not a file')
+                certificate = certificate_path.read_bytes()
             else:
-                certificate = self.client_secret.encode('ascii')
+                certificate = self.client_secret.encode('latin1')
             private_key = serialization.load_pem_private_key(
-                certificate.strip(),
+                certificate,
                 password=None,
                 backend=default_backend()
             )
@@ -142,6 +142,7 @@ class OAuth2ClientCredentials:
         jwt_token = encoded_header + b'.' + encoded_payload + b'.' + encoded_signature
 
         return jwt_token.decode('utf-8')
+
 
 class OAuth2ClientCredentialsPlugin(AuthPlugin):
 
