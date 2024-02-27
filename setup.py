@@ -12,14 +12,13 @@ setup(
     url='https://github.com/satodoc/httpie-oauth2-client-credentials',
     download_url='https://github.com/satodoc/httpie-oauth2-client-credentials',
     py_modules=['httpie_oauth2_client_credentials'],
-    install_requires=['httpie>=3.2.2', 'cryptography>=42.0.3'],
+    install_requires=['httpie>=3.2.2', 'pyjwt[crypto]>=2.8.0'],
     extras_require={
-        "testing": [
-            "pyjwt",
-            "pytest",
-            "pytest-cov",
-            "pytest_httpserver",
-            "werkzeug"
+        'testing': [
+            'pytest',
+            'pytest-cov',
+            'pytest_httpserver',
+            'werkzeug'
         ]
     },
     entry_points={

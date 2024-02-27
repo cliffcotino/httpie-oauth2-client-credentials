@@ -4,17 +4,14 @@ OAuth2.0 client credentials flow plugin for HTTPie.
 import json
 import sys
 import uuid
-from base64 import b64encode, urlsafe_b64encode
+from base64 import b64encode
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+import jwt
 from httpie.cli.definition import parser as httpie_args_parser
 from httpie.plugins import AuthPlugin
 
@@ -93,11 +90,6 @@ class OAuth2ClientCredentials:
         now = datetime.now()
         expiration_time = now + timedelta(seconds=600)  # Token is valid for 10 minutes
 
-        header = {
-            "alg": "RS256",
-            "typ": "JWT"
-        }
-
         payload = {
             'iss': self.client_id,
             'sub': self.client_id,
@@ -107,41 +99,18 @@ class OAuth2ClientCredentials:
             'iat': int(now.timestamp()),
         }
 
-        # Encode header and payload
-        encoded_header = urlsafe_b64encode(json.dumps(header).encode('utf-8')).rstrip(b'=')
-        encoded_payload = urlsafe_b64encode(json.dumps(payload).encode('utf-8')).rstrip(b'=')
-
-        # Create a signature using client_secret
-        signature_input = encoded_header + b'.' + encoded_payload
-
         if self.token_request_type == 'private-key-jwt':
             if self.client_secret.startswith('@'):
                 certificate_path = Path(self.client_secret[1:])
                 if not certificate_path.is_file():
-                    raise ValueError(f'file "{certificate_path}" is not a file')
+                    raise ValueError(f'client_secret "{self.client_secret}" is not a file')
                 certificate = certificate_path.read_bytes()
             else:
-                certificate = self.client_secret.encode('latin1')
-            private_key = serialization.load_pem_private_key(
-                certificate,
-                password=None,
-                backend=default_backend()
-            )
-            # Sign the data
-            signature = private_key.sign(
-                signature_input,
-                padding.PKCS1v15(),
-                hashes.SHA256()
-            )
+                certificate = self.client_secret
         else:
             raise ValueError('token-request-type is invalid value.')
 
-        encoded_signature = urlsafe_b64encode(signature).rstrip(b'=')
-
-        # Combine all parts to create the final JWT
-        jwt_token = encoded_header + b'.' + encoded_payload + b'.' + encoded_signature
-
-        return jwt_token.decode('utf-8')
+        return jwt.encode(payload, key=certificate, algorithm='RS256')
 
 
 class OAuth2ClientCredentialsPlugin(AuthPlugin):

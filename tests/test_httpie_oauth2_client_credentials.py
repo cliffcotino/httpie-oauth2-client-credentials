@@ -185,7 +185,7 @@ def test_token_request_type_private_key_jwt_when_given_missing_file(httpserver: 
     client_secret = '@missing_private_key.pem'
     r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret)
     assert HTTP_OK not in r.stdout
-    assert 'ValueError: file "missing_private_key.pem" is not a file' in r.stderr
+    assert 'ValueError: client_secret "@missing_private_key.pem" is not a file' in r.stderr
 
 
 def test_token_request_type_form_failure(httpserver: HTTPServer):
