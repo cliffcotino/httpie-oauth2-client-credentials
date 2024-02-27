@@ -13,6 +13,25 @@ Another option is to install from local source:
 httpie cli plugins install .
 ```
 
+## Development
+
+Create and activate a venv:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+Install the dependencies used for testing/development:
+```
+pip install -e '.[testing]'
+```
+
+Run the tests for the project:
+```bash
+python -m pytest tests --cov=httpie_oauth2_client_credentials --cov-report=html:build/coverage --capture=no
+```
+
 ## Usage
 
 Since the format of the request to get the token depends on the support of the server, this module supports the following three patterns depending on the `--token-request-type` option.  
