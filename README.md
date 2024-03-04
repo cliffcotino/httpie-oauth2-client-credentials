@@ -1,11 +1,13 @@
-# hca-httpie-auth
+# httpie-oauth2-client-credentials-flow
 
-As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorization: Bearer ${token}` header to the executed request.  
+As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorization: Bearer ${token}` header to the executed request.
+
+**This implementation builds upon the work done by [satodoc](https://github.com/satodoc/httpie-oauth2-client-credentials)**
 
 ## Installation
 
 ```bash
-pip install httpie-oauth2-client-credentials
+pip install httpie-oauth2-client-credentials-flow
 ```
 
 Another option is to install from local source:
@@ -29,7 +31,7 @@ pip install -e '.[testing]'
 
 Run the tests for the project:
 ```bash
-python -m pytest tests --cov=httpie_oauth2_client_credentials --cov-report=html:build/coverage --capture=no
+python -m pytest tests --cov=httpie_oauth2_client_credentials_plugin --cov-report=html:build/coverage --capture=no
 ```
 
 ## Usage
@@ -45,7 +47,7 @@ Since this pattern is the default, you can omit the `--token-request-type` optio
 Execute command:
 
 ```bash
-http --auth-type=oauth2-client-credentials \
+http --auth-type=oauth2-client-credentials-flow \
      --auth="${CLIENT_ID}:${CLIENT_SECRET}" \
      --token-endpoint="${TOKEN_ENDPOINT_URL}" \
      --token-request-type="basic" \
@@ -72,7 +74,7 @@ Send CLIENT_ID and CLIENT_SECRET as part of the Form data.
 Execute command:
 
 ```bash
-http --auth-type=oauth2-client-credentials \
+http --auth-type=oauth2-client-credentials-flow \
      --auth="${CLIENT_ID}:${CLIENT_SECRET}" \
      --token-endpoint="${TOKEN_ENDPOINT_URL}" \
      --token-request-type="form" \
@@ -100,7 +102,7 @@ Sends all request properties as JSON format.
 Execute command:
 
 ```bash
-http --auth-type=oauth2-client-credentials \
+http --auth-type=oauth2-client-credentials-flow \
      --auth="${CLIENT_ID}:${CLIENT_SECRET}" \
      --token-endpoint="${TOKEN_ENDPOINT_URL}" \
      --token-request-type="json" \
@@ -145,6 +147,8 @@ Header:
 }
 ```
 
+**Note**: the `alg` value in the header is `RS256` by default, but can be changed using the `--token-assertion-algorithm` parameter.
+
 Payload:
 ```json
 {
@@ -160,10 +164,11 @@ Payload:
 Execute command:
 
 ```bash
-http --auth-type=oauth2-client-credentials \
+http --auth-type=oauth2-client-credentials-flow \
      --auth="${CLIENT_ID}:${CLIENT_SECRET}" \
      --token-endpoint="${TOKEN_ENDPOINT_URL}" \
      --token-request-type="private-key-jwt" \
+     --token-request-algorithm="RS256" \
      --scope="${SCOPE}" \
      ${TARGET_ENDPOINT_URL}
 ```
@@ -179,6 +184,17 @@ client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-
 &client_assertion=JWT signed using private key ${CLIENT_SECRET}
 &grant_type=client_credentials
 &scope=${SCOPE}
+```
+
+### Client assertion additional headers
+
+It's possible to specify additional headers in the `private-key-jwt` client_assertion header.
+This could, for instance, be necessary for requesting tokens from [Microsoft Identity Platform](https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials).
+In case of multiple header claims, use `;` to separate them.
+
+Example parameter value:
+```bash
+  --token-assertion-headers="x5t:hOBcHZi846VCHSJbFAs26Go9VTQ;kid:XYZ"
 ```
 
 ## Supported .netrc
@@ -203,7 +219,7 @@ EOF
 # Change permission.
 chmod 600 ~/.netrc
 # Example request.
-http --auth-type=oauth2-client-credentials \
+http --auth-type=oauth2-client-credentials-flow \
      --token-endpoint="${TOKEN_ENDPOINT_URL}" \
      --token-request-type="form" \
      --scope="${SCOPE}" \
@@ -212,6 +228,8 @@ http --auth-type=oauth2-client-credentials \
 
 ## Options
 
+- `--print-token-request`  
+  Output the token acquisition request to the console
 - `--print-token-response`  
   Output the token acquisition response to the console
 

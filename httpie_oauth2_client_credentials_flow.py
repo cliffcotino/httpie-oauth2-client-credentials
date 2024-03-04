@@ -1,6 +1,6 @@
-'''
+"""
 OAuth2.0 client credentials flow plugin for HTTPie.
-'''
+"""
 import json
 import sys
 import uuid
@@ -30,7 +30,12 @@ class OAuth2ClientCredentials:
             raise ValueError('token_endpoint is required.')
         self.token_endpoint = options.token_endpoint
         self.token_request_type = options.token_request_type
+        self.token_assertion_algorithm = options.token_assertion_algorithm
+        if self.token_request_type == 'private-key-jwt' and not self.token_assertion_algorithm:
+            raise ValueError(f'token_assertion_algorithm required when token_request_type={self.token_request_type}')
+        self.token_assertion_headers = options.token_assertion_headers
         self.scope = options.scope
+        self.print_token_request = options.print_token_request
         self.print_token_response = options.print_token_response
 
     def __call__(self, request):
@@ -60,7 +65,7 @@ class OAuth2ClientCredentials:
             req_headers = {'Content-Type': 'application/json'}
             post_params['client_id'] = self.client_id
             post_params['client_secret'] = self.client_secret
-            post_data = json.dumps(post_params).encode("utf-8")
+            post_data = json.dumps(post_params).encode('utf8')
         elif self.token_request_type == 'private-key-jwt':
             post_params['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
             post_params['client_assertion'] = self.__create_client_assertion()
@@ -70,6 +75,8 @@ class OAuth2ClientCredentials:
 
         # Execute token request.
         try:
+            if self.print_token_request:
+                sys.stdout.write(f'token_request: \n========== \nheaders:\n{req_headers}\n\ndata:\n{post_data.decode('utf8')}\n==========\n')
             res = urlopen(Request(self.token_endpoint, method='POST', headers=req_headers, data=post_data))
             res_body = json.loads(res.read())
             if self.print_token_response:
@@ -99,24 +106,27 @@ class OAuth2ClientCredentials:
             'iat': int(now.timestamp()),
         }
 
-        if self.token_request_type == 'private-key-jwt':
-            if self.client_secret.startswith('@'):
-                certificate_path = Path(self.client_secret[1:])
-                if not certificate_path.is_file():
-                    raise ValueError(f'client_secret "{self.client_secret}" is not a file')
-                certificate = certificate_path.read_bytes()
-            else:
-                certificate = self.client_secret
-        else:
-            raise ValueError('token-request-type is invalid value.')
+        algorithm = self.token_assertion_algorithm
 
-        return jwt.encode(payload, key=certificate, algorithm='RS256')
+        key = self.client_secret
+        if self.client_secret.startswith('@'):
+            key_path = Path(self.client_secret[1:])
+            if not key_path.is_file():
+                raise ValueError(f'client_secret "{self.client_secret}" is not a file')
+            key = key_path.read_bytes()
+
+        headers = {}
+        extra_headers = self.token_assertion_headers
+        if extra_headers:
+            headers = dict(item.split(':') for item in extra_headers.split(';'))
+
+        return jwt.encode(payload, algorithm=algorithm, key=key, headers=headers)
 
 
 class OAuth2ClientCredentialsPlugin(AuthPlugin):
 
     name = 'OAuth2.0 client credentials flow.'
-    auth_type = 'oauth2-client-credentials'
+    auth_type = 'oauth2-client-credentials-flow'
     netrc_parse = True
     description = 'Set the Bearer token obtained in the OAuth2.0 client_credentials flow to the Authorization header.'
 
@@ -134,21 +144,54 @@ class OAuth2ClientCredentialsPlugin(AuthPlugin):
         help='OAuth 2.0 Token request types.'
     )
     params.add_argument(
+        '--token-assertion-algorithm',
+        default='RS256',
+        choices=(
+            # for ECDSA, RSA based algorithms:
+            'ES256',
+            'ES384',
+            'ES512',
+            'PS256',
+            'PS384',
+            'PS512',
+            'RS256',
+            'RS384',
+            'RS512',
+            # for HMAC based algorithms:
+            'HS256',
+            'HS384',
+            'HS512',
+        ),
+        help='OAuth 2.0 Token request algorithm for private-key-jwt.'
+    )
+    params.add_argument(
+        '--token-assertion-headers',
+        default=None,
+        help='Additional OAuth 2.0 Token assertion headers.'
+    )
+    params.add_argument(
         '--scope',
         default=None,
         metavar='OAUTH2_SCOPE',
         help='OAuth 2.0 Scopes'
     )
     params.add_argument(
+        '--print-token-request',
+        dest='print_token_request',
+        action='store_true',
+        default=False,
+        help='Print OAuth2 token request.'
+    )
+    params.add_argument(
         '--print-token-response',
         dest='print_token_response',
         action='store_true',
         default=False,
-        help='print oauth2 token response.'
+        help='Print OAuth2 token response.'
     )
 
     def get_auth(self, username=None, password=None):
-        '''Add to authorization header
+        """Add to authorization header
         Args:
             username str: client_id(client_id)
             password str: client_secret(client_secret)
@@ -156,5 +199,5 @@ class OAuth2ClientCredentialsPlugin(AuthPlugin):
         Returns:
             requests.models.PreparedRequest:
                 Added authorization header at the request object.
-        '''
+        """
         return OAuth2ClientCredentials(username, password)

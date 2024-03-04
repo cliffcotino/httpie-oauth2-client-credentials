@@ -24,9 +24,9 @@ def http(*args) -> CLIResponse:
     with BytesIO() as stdout, StringIO() as stderr:
         env = MockEnvironment(stdout=stdout, stderr=stderr)
         main(args=['http', *args], env=env)
-        env.stdout.seek(0)
-        env.stderr.seek(0)
-        out = env.stdout.read().decode('utf8')
-        err = env.stderr.read()
+        stdout.seek(0)
+        stderr.seek(0)
+        out = stdout.read().decode('utf8')
+        err = stderr.read()
         r = CLIResponse(stdout=out, stderr=err)
     return r

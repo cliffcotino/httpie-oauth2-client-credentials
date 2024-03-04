@@ -4,16 +4,18 @@ from pathlib import Path
 from typing import Callable, Union
 
 import jwt
+import pytest
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from httpie.plugins.registry import plugin_manager
 from pytest_httpserver import HTTPServer
 from werkzeug.wrappers import Request, Response
 
 from fixtures import http
-from httpie_oauth2_client_credentials import OAuth2ClientCredentialsPlugin
+from httpie_oauth2_client_credentials_flow import OAuth2ClientCredentialsPlugin
 
 HTTP_OK = '200 OK'
 BEARER_TOKEN = 'XYZ'
@@ -39,7 +41,7 @@ def do_test(httpserver: HTTPServer,
             token_response: Response = FIXED_TOKEN_RESPONSE,
             client_id: str = CLIENT_ID,
             client_secret: str = CLIENT_SECRET,
-            print_token_response: bool = False):
+            extra_args: dict = None):
     httpserver.clear()
 
     auth_ok = {'authenticated': True, 'user': CLIENT_ID}
@@ -57,14 +59,18 @@ def do_test(httpserver: HTTPServer,
             '--auth-type', OAuth2ClientCredentialsPlugin.auth_type,
             '--auth', f'{client_id}:{client_secret}',
             '--token-endpoint', httpserver.url_for('/token'),
-            '--scope', 'roles']
+            '--scope', 'roles',
+            '--print-token-request',
+            '--print-token-response']
 
     if token_request_type:
         args.append('--token-request-type')
         args.append(token_request_type)
 
-    if print_token_response:
-        args.append('--print-token-response')
+    if extra_args:
+        for key in extra_args:
+            args.append(key)
+            args.append(extra_args[key])
 
     plugin_manager.register(OAuth2ClientCredentialsPlugin)
     try:
@@ -82,7 +88,7 @@ def test_token_request_type_basic_is_default(httpserver: HTTPServer):
 
     r = do_test(httpserver, token_request_type=None, token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
 
 
 def test_token_request_type_basic(httpserver: HTTPServer):
@@ -94,7 +100,7 @@ def test_token_request_type_basic(httpserver: HTTPServer):
 
     r = do_test(httpserver, token_request_type='basic', token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
 
 
 def test_token_request_type_form(httpserver: HTTPServer):
@@ -107,7 +113,7 @@ def test_token_request_type_form(httpserver: HTTPServer):
 
     r = do_test(httpserver, token_request_type='form', token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
 
 
 def test_token_request_type_json(httpserver: HTTPServer):
@@ -120,7 +126,7 @@ def test_token_request_type_json(httpserver: HTTPServer):
 
     r = do_test(httpserver, token_request_type='json', token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
 
 
 def test_token_request_type_private_key_jwt_when_given_secret(httpserver: HTTPServer):
@@ -128,14 +134,63 @@ def test_token_request_type_private_key_jwt_when_given_secret(httpserver: HTTPSe
         assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
         assert request.form['grant_type'] == CLIENT_CREDENTIALS
         assert request.form['client_assertion_type'] == JWT_BEARER
-        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key)
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key, 'RS256')
 
-    key = generate_key()
+    key = generate_key('RS256')
     client_secret = key.private_key_pem.decode('utf8')
     r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
                 token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
+
+
+def test_token_request_type_private_key_jwt_when_given_additional_headers(httpserver: HTTPServer):
+    def assertions(request: Request):
+        assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
+        assert request.form['grant_type'] == CLIENT_CREDENTIALS
+        assert request.form['client_assertion_type'] == JWT_BEARER
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key, 'RS256')
+
+    key = generate_key('RS256')
+    client_secret = key.private_key_pem.decode('utf8')
+    r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
+                token_assertions=assertions, extra_args={'--token-assertion-headers': 'kid:12345;org:foo'})
+    assert HTTP_OK in r.stdout
+    assert r.stderr == ''
+
+
+@pytest.mark.parametrize('alg',
+                         ['ES256', 'ES384', 'ES512',
+                          'PS256', 'PS384', 'PS512',
+                          'RS256', 'RS384', 'RS512'])
+def test_token_request_type_private_key_jwt_for_different_RSA_algorithms(httpserver: HTTPServer, alg):
+    def assertions(request: Request):
+        assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
+        assert request.form['grant_type'] == CLIENT_CREDENTIALS
+        assert request.form['client_assertion_type'] == JWT_BEARER
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key, alg)
+
+    key = generate_key(alg)
+    client_secret = key.private_key_pem.decode('utf8')
+    r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
+                token_assertions=assertions, extra_args={'--token-assertion-algorithm': alg})
+    assert HTTP_OK in r.stdout
+    assert r.stderr == ''
+
+
+@pytest.mark.parametrize('alg', ['HS256', 'HS384', 'HS512'])
+def test_token_request_type_private_key_jwt_for_different_HMAC_algorithms(httpserver: HTTPServer, alg):
+    def assertions(request: Request):
+        assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
+        assert request.form['grant_type'] == CLIENT_CREDENTIALS
+        assert request.form['client_assertion_type'] == JWT_BEARER
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), client_secret, alg)
+
+    client_secret = 'T9uMeJ86HugEuaYCABzEOXDBLYDrvp5v'
+    r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
+                token_assertions=assertions, extra_args={'--token-assertion-algorithm': alg})
+    assert HTTP_OK in r.stdout
+    assert r.stderr == ''
 
 
 def test_token_request_type_private_key_jwt_when_given_secret_file(httpserver: HTTPServer, tmp_path):
@@ -143,9 +198,9 @@ def test_token_request_type_private_key_jwt_when_given_secret_file(httpserver: H
         assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
         assert request.form['grant_type'] == CLIENT_CREDENTIALS
         assert request.form['client_assertion_type'] == JWT_BEARER
-        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key)
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key, 'RS256')
 
-    key = generate_key()
+    key = generate_key('RS256')
     private_key_pem_path = Path(tmp_path / 'private_key.pem')
     private_key_pem_path.write_bytes(key.private_key_pem)
 
@@ -153,21 +208,29 @@ def test_token_request_type_private_key_jwt_when_given_secret_file(httpserver: H
     r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
                 token_assertions=assertions)
     assert HTTP_OK in r.stdout
-    assert len(r.stderr) == 0
+    assert r.stderr == ''
 
 
 @dataclass
 class GeneratedKey:
     private_key_pem: bytes
-    public_key: RSAPublicKey
+    public_key: Union[RSAPublicKey, EllipticCurvePublicKey]
 
 
-def generate_key():
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
-    )
+def generate_key(alg: str):
+    if alg.startswith('ES'):
+        private_key = ec.generate_private_key(
+            curve=ec.SECP192R1(),
+            backend=default_backend()
+        )
+    elif alg.startswith('PS') or alg.startswith('RS'):
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+    else:
+        raise ValueError(f'Unexpected value for alg: {alg}')
     public_key = private_key.public_key()
     private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -177,8 +240,11 @@ def generate_key():
     return GeneratedKey(private_key_pem, public_key)
 
 
-def verify_client_assertion(client_assertion: str, audience: str, public_key: RSAPublicKey):
-    jwt.decode(client_assertion, issuer=CLIENT_ID, audience=audience, algorithms='RS256', verify=True, key=public_key)
+def verify_client_assertion(client_assertion: str,
+                            audience: str,
+                            key: Union[RSAPublicKey, EllipticCurvePublicKey, str, bytes],
+                            algorithm: str):
+    jwt.decode(client_assertion, issuer=CLIENT_ID, audience=audience, algorithms=algorithm, verify=True, key=key)
 
 
 def test_token_request_type_private_key_jwt_when_given_missing_file(httpserver: HTTPServer):
@@ -188,21 +254,29 @@ def test_token_request_type_private_key_jwt_when_given_missing_file(httpserver: 
     assert 'ValueError: client_secret "@missing_private_key.pem" is not a file' in r.stderr
 
 
-def test_token_request_type_form_failure(httpserver: HTTPServer):
+def test_token_request_type_form_failure_when_json(httpserver: HTTPServer):
     token_response = Response(status=400, response=json.dumps({
         'error': 'invalid_client',
         'error_description': 'Client authentication failed'
     }))
 
-    r = do_test(httpserver, token_request_type='form', token_response=token_response, print_token_response=True)
-    assert len(r.stdout) == 0
+    r = do_test(httpserver, token_request_type='form', token_response=token_response)
+    assert r.stdout == ''
+    assert '400: BAD REQUEST' in r.stderr
+
+
+def test_token_request_type_form_failure_when_just_bytes(httpserver: HTTPServer):
+    token_response = Response(status=400, response='bytes'.encode())
+
+    r = do_test(httpserver, token_request_type='form', token_response=token_response)
+    assert r.stdout == ''
     assert '400: BAD REQUEST' in r.stderr
 
 
 def test_when_no_client_id_provided(httpserver: HTTPServer):
     try:
         do_test(httpserver, token_request_type='form', client_id='')
-        assert 1 == 0
+        assert False
     except ValueError as e:
         assert 'client_id is required.' in e.args
 
@@ -210,6 +284,6 @@ def test_when_no_client_id_provided(httpserver: HTTPServer):
 def test_when_no_client_secret_provided(httpserver: HTTPServer):
     try:
         do_test(httpserver, token_request_type='form', client_secret='')
-        assert 1 == 0
+        assert False
     except ValueError as e:
         assert 'client_secret is required.' in e.args
