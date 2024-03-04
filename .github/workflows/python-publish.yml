@@ -7,7 +7,7 @@ on:
 jobs:
   pypi-publish:
     runs-on: ubuntu-latest
-    environment: testing
+    environment: production
     steps:
     - name: Checkout resource
       uses: actions/checkout@v3
