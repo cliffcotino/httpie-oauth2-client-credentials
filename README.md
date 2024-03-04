@@ -6,11 +6,17 @@ As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_creden
 
 ## Installation
 
+Recommended installation method using [httpie cli plugins](https://httpie.io/docs/cli/httpie-cli-plugins):
+```bash
+httpie cli plugins install httpie-oauth2-client-credentials-flow
+```
+
+Otherwise, to install in the default pip location:
 ```bash
 pip install httpie-oauth2-client-credentials-flow
 ```
 
-Another option is to install from local source:
+Another option is to install from local source (after cloning the repository):
 ```bash
 httpie cli plugins install .
 ```
@@ -31,7 +37,7 @@ pip install -e '.[testing]'
 
 Run the tests for the project:
 ```bash
-python -m pytest tests --cov=httpie_oauth2_client_credentials_plugin --cov-report=html:build/coverage --capture=no
+python -m pytest tests --cov=httpie_oauth2_client_credentials_flow --cov-report=html:build/coverage --capture=no
 ```
 
 ## Usage
