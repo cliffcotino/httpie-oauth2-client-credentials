@@ -2,18 +2,20 @@
 OAuth2.0 client credentials flow plugin for HTTPie.
 """
 import json
-import sys
 import uuid
 from base64 import b64encode
 from datetime import datetime, timedelta
+from json import JSONDecodeError
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import jwt
+import sys
 from httpie.cli.definition import parser as httpie_args_parser
 from httpie.plugins import AuthPlugin
+from jwt import PyJWK
 
 
 class OAuth2ClientCredentials:
@@ -114,6 +116,16 @@ class OAuth2ClientCredentials:
             if not key_path.is_file():
                 raise ValueError(f'client_secret "{self.client_secret}" is not a file')
             key = key_path.read_bytes()
+
+        try:
+            jwk = PyJWK(json.loads(key))
+            key = jwk.key
+            jwk_format = True
+        except JSONDecodeError:
+            jwk_format = False
+
+        if jwk_format and self.print_token_request:
+            sys.stdout.write('client_secret was in JWK format\n')
 
         headers = {}
         extra_headers = self.token_assertion_headers

@@ -135,12 +135,28 @@ Content-Type: application/json
 
 Sends a request with `client_assertion_type` set to `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` as defined by the [private_key_jwt](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication) client authentication method.
 The `${CLIENT_SECRET}` value must be a private key in PEM format (or a reference to a certificate in PEM format if the value starts with a `@`-character).
+The `${CLIENT_SECRET}` value can also contain a key in JWK format (or a reference to a file with a JWK if the value starts with a `@`-character).
 
 Private key example:
 ```text
 -----BEGIN PRIVATE KEY-----
 ....
 -----END PRIVATE KEY-----
+```
+
+Private JWK example:
+```json
+{
+  "p": "4Rbv6bQKVPdT5DOjvM8jaD95uQ3TIOYawN5aNemrt6tUBWZHFYA-XhL-bPo-i6BFMc0bOGaAuEEGXLXO6iiCV8Cuel7y1zULoWM4-Yv4xwbwG00nNQKajftbBkC0AfSdWw5H-3cCT35C8FdrbB-uB6q5h7JRcM28NzjXMDZZ9u0",
+  "kty": "RSA",
+  "q": "8kGdDO2zS9SbInE7DHCGzW9GNTXB4zLlerL0KmkJ1OM9eIrxkycsqZsXJK9-h-S93HCD7gAITCYefMsyGVBc76VmzyQ5GCGHZoYNVInsGi5_yZP_5CijPO_xAG_ptwThxZznMGCLQllpcaXgE0Y6Z86tUWRoz1PUepjoxFBLJBE",
+  "d": "Ho5rZceJdzgU1B0o88w-ghIlOS-D8IJuzsGP_aysevFL5Gst_EcrmU_-V0PrsHWOqiWyny6bEjhkqPI8TbzLQ8SMFK9fRFY9ttFKeQHpGlhCCc1y0p4pMXP4tNtQHag83UPCZHwA7HW4xD6tFbE7Z4j7Qz_8r3f4q-JNKbfymKXmmVWlQIc6Yyb0FOismh-JuM_PDwpMCjzMsgT4arR4XSeX7Uek47IKdqeB6qSoRiwBBY-9jmA0oFE5twPYz8JRy_FKyzGqXDpNo26IL2eJyFXnv4HBBJuBnAm__9XY04qMAgTBHjWOcJSQV7U-P_pW6APLACVXXfxhe0w7tP8IIQ",
+  "e": "AQAB",
+  "qi": "BamCvtzPOnm0GR6LmJxQrjuH4VxdCXBGuElNNe8N5LhqalKyJaYufKF8IaFbyc53SHYkg-GVW4DkfQl60T15OwQCuwPjrSzM-6kXtviHYXN8_NNLN8doMkf_uZ1ImSVTUms9AhzK96FEOGULkVVJafmJQR6ZLI3E_wA5Gn5mJrU",
+  "dp": "X5xcoErHsLu2ONLulD7wbVG5JLAIpIrZhl9stkXhmQz_jaOaQjnNRCyRQj0x4CFeAv96toRj3OBSEYNwtuoqI5hHBNfcEyoHHLCG_QlFzVTXHOGy68OFXxYL3iYR0FrVlF4GmXw90QJy8KBRkwYJ6FvOnyNRkLbzYgmU7nfH0yk",
+  "dq": "uUSEnwaKQEvv-H8v8Wt9LE8VGkxqYx7hcNy67lQ2OKEwuadI6IjlFzCMmnm8AqFksdk6jCFqNxJP7pBXWBSlfoC4B2JkZ5f8vON3_lccQUmeYMLWx95sOIYngXYU_uq03zQHem_bEHrgsRFyNEtZD1p4Ie7wWN57eObH3JqrXIE",
+  "n": "1QFftEW97yHqd3TUsKT3QRVJu8FZDi7l7sYP2qixM07ruEBvvGSVSU4LY5mIjby--yY84eBkqdgh6QPqDVhfwUH1tqfQuKiNn41z21v4p6m_KvDdG2EHIyT3-eas9lRYNe6JU3TJIZQDYCWBF6hZqTq-GMkr1q7mcOTCChP3yvoqyXAhJ9wtcseCJ3iJ9huQDcu7NEZrb2_tVO3G9OLcc8XsynmzmI_4rohii9Ct68HVCGwHifDiixw-9Ge0pSM7bMHAvLvtUf2XNsLpSwZ4_0vDNSSNknTJ96DSB63K4AUO5zEpqaKG6dlrKN1hLdupXE_vRAUT_LB4hPDRqiG5vQ"
+}
 ```
 
 The private key is used to generate a signature for the JWT with the following header and payload:
