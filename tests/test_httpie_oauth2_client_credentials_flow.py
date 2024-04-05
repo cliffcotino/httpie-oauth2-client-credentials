@@ -1,20 +1,17 @@
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Union
 
 import jwt
 import pytest
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from httpie.plugins.registry import plugin_manager
+from jwt import PyJWK
 from pytest_httpserver import HTTPServer
 from werkzeug.wrappers import Request, Response
 
-from fixtures import http
+from fixtures import http, generate_key, generate_jwk
 from httpie_oauth2_client_credentials_flow import OAuth2ClientCredentialsPlugin
 
 HTTP_OK = '200 OK'
@@ -193,6 +190,25 @@ def test_token_request_type_private_key_jwt_for_different_HMAC_algorithms(httpse
     assert r.stderr == ''
 
 
+def test_token_request_type_private_key_jwt_when_given_jwk(httpserver: HTTPServer, tmp_path):
+    def assertions(request: Request):
+        assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
+        assert request.form['grant_type'] == CLIENT_CREDENTIALS
+        assert request.form['client_assertion_type'] == JWT_BEARER
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key(), 'RS256')
+
+    jwk = generate_jwk()
+    jwk_string = json.dumps(jwk)
+
+    key = PyJWK.from_dict(jwk).key
+
+    client_secret = jwk_string
+    r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
+                token_assertions=assertions)
+    assert HTTP_OK in r.stdout
+    assert r.stderr == ''
+
+
 def test_token_request_type_private_key_jwt_when_given_secret_file(httpserver: HTTPServer, tmp_path):
     def assertions(request: Request):
         assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
@@ -211,33 +227,25 @@ def test_token_request_type_private_key_jwt_when_given_secret_file(httpserver: H
     assert r.stderr == ''
 
 
-@dataclass
-class GeneratedKey:
-    private_key_pem: bytes
-    public_key: Union[RSAPublicKey, EllipticCurvePublicKey]
+def test_token_request_type_private_key_jwt_when_given_jwk_file(httpserver: HTTPServer, tmp_path):
+    def assertions(request: Request):
+        assert request.headers['Content-Type'] == APPLICATION_WWW_FORM_URLENCODED
+        assert request.form['grant_type'] == CLIENT_CREDENTIALS
+        assert request.form['client_assertion_type'] == JWT_BEARER
+        verify_client_assertion(request.form['client_assertion'], httpserver.url_for('/token'), key.public_key(), 'RS256')
 
+    jwk = generate_jwk()
+    jwk_string = json.dumps(jwk)
+    jwk_path = Path(tmp_path / 'private_key.jwk')
+    jwk_path.write_bytes(jwk_string.encode('utf8'))
 
-def generate_key(alg: str):
-    if alg.startswith('ES'):
-        private_key = ec.generate_private_key(
-            curve=ec.SECP192R1(),
-            backend=default_backend()
-        )
-    elif alg.startswith('PS') or alg.startswith('RS'):
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
-    else:
-        raise ValueError(f'Unexpected value for alg: {alg}')
-    public_key = private_key.public_key()
-    private_key_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
-    )
-    return GeneratedKey(private_key_pem, public_key)
+    key = PyJWK.from_dict(jwk).key
+
+    client_secret = f'@{jwk_path}'
+    r = do_test(httpserver, token_request_type='private-key-jwt', client_secret=client_secret,
+                token_assertions=assertions)
+    assert HTTP_OK in r.stdout
+    assert r.stderr == ''
 
 
 def verify_client_assertion(client_assertion: str,
