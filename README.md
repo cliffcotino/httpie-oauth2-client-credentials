@@ -2,7 +2,7 @@
 
 As an auth plugin for httpie, it obtains a token with the OAuth2.0 client_credentials flow before executing http, and adds the `Authorization: Bearer ${token}` header to the executed request.
 
-**This implementation builds upon the work done by [totycro](https://github.com/totycro/httpie-oauth2-client-credentials)**
+**This implementation builds upon the work done by [satodoc](https://github.com/satodoc/httpie-auth-plugin-for-oauth2-client-credentials) and [totycro](https://github.com/totycro/httpie-oauth2-client-credentials)**
 
 ## Installation
 
